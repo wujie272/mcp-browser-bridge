@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    :root {
+      --bg: #1a1b1e;
+      --card: #25262b;
+      --border: #373a40;
+      --text: #c1c2c5;
+      --text-bright: #ffffff;
+      --accent: #4c9aff;
+      --green: #51cf66;
+      --red: #ff6b6b;
+      --orange: #fcc419;
+      --radius: 8px;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      width: 340px;
+      font-size: 13px;
+    }
+    .header {
+      background: var(--card);
+      padding: 12px 14px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .logo { font-weight: 700; font-size: 14px; color: var(--text-bright); }
+    .logo span { color: var(--accent); }
+    .status-badge {
+      padding: 3px 10px;
+      border-radius: 12px;
+      font-size: 11px;
+      font-weight: 600;
+    }
+    .status-connected { background: #2b8a3e22; color: var(--green); border: 1px solid #2b8a3e44; }
+    .status-disconnected { background: #c92a2a22; color: var(--red); border: 1px solid #c92a2a44; }
+    .status-connecting { background: #e6770022; color: var(--orange); border: 1px solid #e6770044; }
+    .status-failed { background: #c92a2a22; color: var(--red); border: 1px solid #c92a2a44; }
+    .section { padding: 10px 14px; border-bottom: 1px solid var(--border); }
+    .section-title { font-size: 11px; font-weight: 600; text-transform: uppercase; color: #888; margin-bottom: 8px; letter-spacing: 0.5px; }
+    .info-row { display: flex; justify-content: space-between; padding: 4px 0; }
+    .info-label { color: #888; }
+    .info-value { color: var(--text-bright); max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 7px 14px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      background: var(--card);
+      color: var(--text);
+      cursor: pointer;
+      font-size: 12px;
+      transition: all 0.15s;
+    }
+    .btn:hover { background: #373a40; }
+    .btn-primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+    .btn-primary:hover { filter: brightness(1.1); }
+    .btn-danger { color: var(--red); border-color: #c92a2a44; }
+    .btn-danger:hover { background: #c92a2a22; }
+    .btn-row { display: flex; gap: 8px; flex-wrap: wrap; }
+    .url-box {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 8px 10px;
+      font-size: 11px;
+      word-break: break-all;
+      color: var(--text);
+      max-height: 44px;
+      overflow: hidden;
+      margin-top: 4px;
+    }
+    .actions { display: flex; flex-wrap: wrap; gap: 8px; }
+    .log-box {
+      background: #00000033;
+      border-radius: var(--radius);
+      padding: 8px;
+      max-height: 80px;
+      overflow-y: auto;
+      font-family: 'SF Mono', 'Fira Code', monospace;
+      font-size: 10px;
+      line-height: 1.5;
+    }
+    .log-entry { color: #888; }
+    .log-entry.ok { color: var(--green); }
+    .log-entry.err { color: var(--red); }
+    .footer { padding: 8px 14px; text-align: center; font-size: 10px; color: #555; }
+    a { color: var(--accent); text-decoration: none; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div class="logo">MCP <span>Bridge</span></div>
+    <span id="statusBadge" class="status-badge status-disconnected">● 未连接</span>
+  </div>
+
+  <div class="section">
+    <div class="section-title">连接</div>
+    <div class="btn-row">
+      <button class="btn btn-primary" id="btnConnect">连接</button>
+      <button class="btn btn-danger" id="btnDisconnect">断开</button>
+      <button class="btn" id="btnReconnect">⟳ 重连</button>
+    </div>
+    <div style="margin-top:8px">
+      <div class="info-row">
+        <span class="info-label">WebSocket</span>
+        <span class="info-value" id="wsUrl">ws://127.0.0.1:9234</span>
+      </div>
+      <div class="info-row">
+        <span class="info-label">重连次数</span>
+        <span class="info-value" id="reconnectCount">0</span>
+      </div>
+      <div class="info-row">
+        <span class="info-label">待处理命令</span>
+        <span class="info-value" id="pendingCount">0</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">当前页面</div>
+    <div class="info-row">
+      <span class="info-label" id="pageTitle">—</span>
+    </div>
+    <div class="url-box" id="pageUrl">—</div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">快速操作</div>
+    <div class="actions">
+      <button class="btn" id="btnRefreshInfo">↻ 刷新信息</button>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">事件日志</div>
+    <div class="log-box" id="logBox">
+      <div class="log-entry">启动中...</div>
+    </div>
+  </div>
+
+  <div class="footer">
+    MCP Browser Bridge v1.0 · <a href="#" id="linkOptions">选项</a>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
