@@ -473,17 +473,6 @@ async def browser_get_images() -> dict:
     return result if not result.get("success") else _wrap(result.get("data", {}))
 
 
-# --- 截图工具 ---
-
-@mcp.tool()
-async def browser_screenshot() -> dict:
-    """📸 截取当前浏览器页面的截图（返回 base64 PNG 数据）。
-    适合 AI 查看页面视觉布局、验证元素位置、识别图片内容。
-    返回格式：{ dataUrl: "data:image/png;base64,...", format: "png" }"""
-    result = await send_command("captureScreenshot")
-    return result
-
-
 # --- 标签页管理 ---
 
 @mcp.tool()

@@ -402,20 +402,6 @@
     return walk(document.body, 0);
   }
 
-  /** 获取页面截图（通过 canvas 绘制） */
-  function getPageScreenshot() {
-    return new Promise((resolve, reject) => {
-      try {
-        // 使用 dom-to-image 风格，但这里只是占位
-        // 实际截图需要 canvas 绘制，但跨域问题严重
-        // 建议使用 browser.tabs.captureVisibleTab（需要权限）
-        reject(new Error('Screenshot requires background script API'));
-      } catch (e) {
-        reject(e);
-      }
-    });
-  }
-
   /** 获取当前滚动位置和页面尺寸 */
   function getScrollInfo() {
     return {

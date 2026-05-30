@@ -145,26 +145,6 @@ async function handleCommand(msg) {
 
   try {
     // 处理需要在 background script 中执行的特殊命令
-    if (action === 'captureScreenshot') {
-      try {
-        const dataUrl = await browser.tabs.captureVisibleTab(null, { format: 'png' });
-        sendWS({
-          id,
-          type: 'response',
-          success: true,
-          data: { dataUrl, format: 'png' },
-        });
-      } catch (e) {
-        sendWS({
-          id,
-          type: 'response',
-          success: false,
-          error: `Screenshot failed: ${e.message}`,
-        });
-      }
-      return;
-    }
-
     if (action === 'getAllTabs') {
       try {
         const allTabs = await browser.tabs.query({});
