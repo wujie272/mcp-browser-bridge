@@ -521,6 +521,27 @@
     return { elements: elements.slice(0, 500), total: index };
   }
 
+  // ========== v2.0 状态管理 ==========
+
+  /** 控制台日志缓存 */
+  let __consoleLogs = [];
+  let __consoleCapturing = false;
+  let __consoleHandler = null;
+
+  /** 网络请求拦截缓存 */
+  let __networkLogs = [];
+  let __networkCapturing = false;
+
+  /** 变更观察器缓存 */
+  let __mutationLog = [];
+  let __mutationObserver = null;
+
+  /** 页面错误缓存 */
+  let __pageErrors = [];
+  let __errorHandlerInstalled = false;
+
+
+
   // ========== 命令分发器 ==========
 
   const actions = {
@@ -993,6 +1014,422 @@
         selector: generateSelector(scrollTarget),
         context: bestContext,
         rect: {
+
+    // ===== v2.0 功能 =====
+
+    /** 页面截图（可见视口 Canvas 截图） */
+    takeScreenshot: async (p) => {
+      const scale = p.scale || 1;
+      const useFullPage = p.fullPage || false;
+      const captureElement = p.selector || null;
+
+      // 如果指定了元素选择器，对该元素截图
+      if (captureElement) {
+        const el = findElement(captureElement);
+        if (!el) throw new Error('Element not found');
+        const rect = el.getBoundingClientRect();
+        const canvas = document.createElement('canvas');
+        canvas.width = rect.width * scale;
+        canvas.height = rect.height * scale;
+        const ctx = canvas.getContext('2d');
+        ctx.scale(scale, scale);
+        // 使用 html2canvas 风格——绘制元素区域
+        ctx.drawWindow(window, rect.x, rect.y, rect.width, rect.height, '#ffffff');
+        return { dataUrl: canvas.toDataURL('image/png'), width: canvas.width, height: canvas.height, element: captureElement };
+      }
+
+      // 全页截图：遍历滚动拼接
+      if (useFullPage) {
+        const fullW = Math.max(document.documentElement.scrollWidth, document.body.scrollWidth);
+        const fullH = Math.max(document.documentElement.scrollHeight, document.body.scrollHeight);
+        const vpH = window.innerHeight;
+        const canvas = document.createElement('canvas');
+        canvas.width = fullW * scale;
+        canvas.height = fullH * scale;
+        const ctx = canvas.getContext('2d');
+        ctx.scale(scale, scale);
+
+        // 分段截图
+        const segments = Math.ceil(fullH / vpH);
+        for (let i = 0; i < segments; i++) {
+          window.scrollTo(0, i * vpH);
+          await new Promise(r => setTimeout(r, 200));
+          ctx.drawWindow(window, 0, i * vpH, fullW, Math.min(vpH, fullH - i * vpH), '#ffffff');
+        }
+        // 恢复滚动
+        window.scrollTo(0, 0);
+        return { dataUrl: canvas.toDataURL('image/png'), width: canvas.width, height: canvas.height, fullPage: true };
+      }
+
+      // 视口截图
+      const canvas = document.createElement('canvas');
+      canvas.width = window.innerWidth * scale;
+      canvas.height = window.innerHeight * scale;
+      const ctx = canvas.getContext('2d');
+      ctx.scale(scale, scale);
+      ctx.drawWindow(window, window.scrollX, window.scrollY, window.innerWidth, window.innerHeight, '#ffffff');
+      return { dataUrl: canvas.toDataURL('image/png'), width: canvas.width, height: canvas.height, viewport: true };
+    },
+
+    /** 开始/停止控制台日志捕获 */
+    captureConsole: (p) => {
+      if (p.active === false && __consoleCapturing) {
+        __consoleCapturing = false;
+        if (__consoleHandler) {
+          // 从全局拦截中移除
+          const origError = console.error;
+          const origWarn = console.warn;
+          const origLog = console.log;
+          console.log = origLog;
+          console.warn = origWarn;
+          console.error = origError;
+          window.removeEventListener('error', __consoleHandler);
+          __consoleHandler = null;
+        }
+        return { active: false, captured: __consoleLogs.length };
+      }
+      if (p.active && !__consoleCapturing) {
+        __consoleCapturing = true;
+        // 拦截 console
+        const origLog = console.log;
+        const origWarn = console.warn;
+        const origError = console.error;
+        const capture = (level) => (...args) => {
+          __consoleLogs.push({ level, message: args.map(a => typeof a === 'object' ? JSON.stringify(a).slice(0, 500) : String(a)).join(' '), timestamp: Date.now() });
+          if (__consoleLogs.length > 500) __consoleLogs.shift();
+          // 保持原始行为
+          if (level === 'log') return origLog.apply(console, args);
+          if (level === 'warn') return origWarn.apply(console, args);
+          return origError.apply(console, args);
+        };
+        console.log = capture('log');
+        console.warn = capture('warn');
+        console.error = capture('error');
+        // 捕获页面错误
+        __consoleHandler = (event) => {
+          __consoleLogs.push({ level: 'error', message: `${event.message} at ${event.filename}:${event.lineno}`, timestamp: Date.now() });
+          if (__consoleLogs.length > 500) __consoleLogs.shift();
+        };
+        window.addEventListener('error', __consoleHandler);
+        return { active: true };
+      }
+      return { active: __consoleCapturing, captured: __consoleLogs.length };
+    },
+
+    /** 获取捕获的控制台日志 */
+    getCapturedConsole: () => ({ logs: __consoleLogs, count: __consoleLogs.length }),
+
+    /** 清除控制台日志 */
+    clearCapturedConsole: () => { __consoleLogs = []; return { cleared: true }; },
+
+    /** 开始/停止网络请求拦截 */
+    interceptNetwork: (p) => {
+      if (p.active === false) {
+        __networkCapturing = false;
+        return { active: false, captured: __networkLogs.length };
+      }
+      if (p.active && !__networkCapturing) {
+        __networkCapturing = true;
+        // 拦截 fetch
+        const origFetch = window.fetch;
+        window.fetch = async (...args) => {
+          const url = typeof args[0] === 'string' ? args[0] : (args[0]?.url || '');
+          const startTime = performance.now();
+          __networkLogs.push({ type: 'fetch', url: url.slice(0, 500), method: args[1]?.method || 'GET', startTime: Date.now(), status: 'pending' });
+          if (__networkLogs.length > 200) __networkLogs.shift();
+          try {
+            const response = await origFetch.apply(window, args);
+            const entry = __networkLogs.find(e => e.url === url && e.status === 'pending');
+            if (entry) { entry.status = response.ok ? 'success' : 'error'; entry.statusCode = response.status; entry.duration = Math.round(performance.now() - startTime); }
+            return response;
+          } catch (e) {
+            const entry = __networkLogs.find(e => e.url === url && e.status === 'pending');
+            if (entry) { entry.status = 'error'; entry.error = e.message; entry.duration = Math.round(performance.now() - startTime); }
+            throw e;
+          }
+        };
+        // 拦截 XHR
+        const origOpen = XMLHttpRequest.prototype.open;
+        const origSend = XMLHttpRequest.prototype.send;
+        XMLHttpRequest.prototype.open = function(...args) {
+          this._mcpUrl = args[1] || '';
+          this._mcpMethod = args[0] || 'GET';
+          return origOpen.apply(this, args);
+        };
+        XMLHttpRequest.prototype.send = function(...args) {
+          const self = this;
+          const url = self._mcpUrl || '';
+          const startTime = performance.now();
+          __networkLogs.push({ type: 'xhr', url: url.slice(0, 500), method: self._mcpMethod || 'GET', startTime: Date.now(), status: 'pending' });
+          if (__networkLogs.length > 200) __networkLogs.shift();
+          self.addEventListener('loadend', () => {
+            const entry = __networkLogs.find(e => e.url === url && e.status === 'pending');
+            if (entry) { entry.status = self.status >= 200 && self.status < 400 ? 'success' : 'error'; entry.statusCode = self.status; entry.duration = Math.round(performance.now() - startTime); }
+          });
+          return origSend.apply(self, args);
+        };
+        return { active: true };
+      }
+      return { active: __networkCapturing, captured: __networkLogs.length };
+    },
+
+    /** 获取捕获的网络请求 */
+    getInterceptedNetwork: (p) => {
+      const filter = p?.filter;
+      const items = filter ? __networkLogs.filter(e => e.url.includes(filter)) : __networkLogs;
+      return { items: items.slice(0, 100), count: items.length, totalCaptured: __networkLogs.length };
+    },
+
+    /** 清除网络日志 */
+    clearInterceptedNetwork: () => { __networkLogs = []; return { cleared: true }; },
+
+    /** 自动填充表单（调试用） */
+    autofillForm: (p) => {
+      const formIdx = p.formIndex;
+      const customValues = p.values || {};
+      // 查找表单
+      let forms = document.querySelectorAll('form');
+      if (formIdx !== undefined && formIdx >= 0 && formIdx < forms.length) {
+        forms = [forms[formIdx]];
+      }
+      const filled = [];
+      forms.forEach(form => {
+        form.querySelectorAll('input:not([type=hidden]), select, textarea').forEach(el => {
+          const name = el.name || el.id;
+          const type = el.type || 'text';
+          // 如果用户指定了值，用指定的
+          if (customValues[name]) {
+            el.value = customValues[name];
+            el.dispatchEvent(new Event('input', { bubbles: true }));
+            el.dispatchEvent(new Event('change', { bubbles: true }));
+            filled.push({ name, value: customValues[name] });
+            return;
+          }
+          // 自动根据类型生成测试数据
+          let value = '';
+          switch (type) {
+            case 'email': value = 'test@example.com'; break;
+            case 'tel': value = '13800138000'; break;
+            case 'url': value = 'https://example.com'; break;
+            case 'password': value = 'TestPassword123!'; break;
+            case 'number': value = '42'; break;
+            case 'search': value = 'test'; break;
+            case 'checkbox': el.checked = true; filled.push({ name, value: 'checked' }); return;
+            default:
+              if (el.placeholder) value = el.placeholder;
+              else value = '测试数据';
+          }
+          if (value) {
+            el.value = value;
+            el.dispatchEvent(new Event('input', { bubbles: true }));
+            el.dispatchEvent(new Event('change', { bubbles: true }));
+            filled.push({ name, value });
+          }
+        });
+      });
+      return { filled: filled.length, fields: filled };
+    },
+
+    /** 获取页面性能指标 */
+    getPerformanceMetrics: () => {
+      const nav = performance.getEntriesByType('navigation')[0];
+      const paint = performance.getEntriesByType('paint');
+      const fcp = paint.find(e => e.name === 'first-contentful-paint');
+      return {
+        domContentLoaded: nav ? Math.round(nav.domContentLoadedEventEnd) : null,
+        domComplete: nav ? Math.round(nav.domComplete) : null,
+        loadEventEnd: nav ? Math.round(nav.loadEventEnd) : null,
+        firstPaint: paint.find(e => e.name === 'first-paint') ? Math.round(paint.find(e => e.name === 'first-paint').startTime) : null,
+        firstContentfulPaint: fcp ? Math.round(fcp.startTime) : null,
+        domInteractive: nav ? Math.round(nav.domInteractive) : null,
+        transferSize: nav ? nav.transferSize : null,
+        encodedBodySize: nav ? nav.encodedBodySize : null,
+        decodedBodySize: nav ? nav.decodedBodySize : null,
+        duration: nav ? Math.round(nav.duration) : null,
+        protocol: nav ? nav.nextHopProtocol : null,
+        type: nav ? nav.type : null,
+        resources: performance.getEntriesByType('resource').length,
+        memory: performance.memory ? {
+          usedJSHeapSize: performance.memory.usedJSHeapSize,
+          totalJSHeapSize: performance.memory.totalJSHeapSize,
+          jsHeapSizeLimit: performance.memory.jsHeapSizeLimit,
+        } : null,
+        now: Date.now(),
+      };
+    },
+
+    /** 获取页面 JavaScript 错误 */
+    getPageErrors: () => {
+      if (!__errorHandlerInstalled) {
+        __errorHandlerInstalled = true;
+        window.addEventListener('error', (e) => {
+          __pageErrors.push({
+            type: 'error',
+            message: e.message,
+            source: e.filename,
+            line: e.lineno,
+            col: e.colno,
+            stack: e.error?.stack,
+            timestamp: Date.now(),
+          });
+          if (__pageErrors.length > 200) __pageErrors.shift();
+        });
+        window.addEventListener('unhandledrejection', (e) => {
+          __pageErrors.push({
+            type: 'unhandledrejection',
+            message: e.reason?.message || String(e.reason),
+            stack: e.reason?.stack,
+            timestamp: Date.now(),
+          });
+          if (__pageErrors.length > 200) __pageErrors.shift();
+        });
+      }
+      return { errors: __pageErrors.slice(0, 100), count: __pageErrors.length };
+    },
+
+    /** 清除页面错误 */
+    clearPageErrors: () => { __pageErrors = []; return { cleared: true }; },
+
+    /** 开始/停止 DOM 变更观察 */
+    watchMutations: (p) => {
+      if (p.active === false) {
+        if (__mutationObserver) { __mutationObserver.disconnect(); __mutationObserver = null; }
+        return { active: false, captured: __mutationLog.length };
+      }
+      if (p.active && !__mutationObserver) {
+        __mutationObserver = new MutationObserver((mutations) => {
+          mutations.forEach(m => {
+            if (__mutationLog.length > 200) return;
+            const target = m.target;
+            const tag = target.tagName?.toLowerCase() || '';
+            const id = target.id || '';
+            const text = target.textContent?.trim().slice(0, 100) || '';
+            __mutationLog.push({
+              type: m.type,
+              target: `${tag}${id ? '#'+id : ''}`,
+              addedNodes: m.addedNodes.length,
+              removedNodes: m.removedNodes.length,
+              attributeName: m.attributeName || null,
+              oldValue: m.oldValue?.slice(0, 200) || null,
+              newValue: m.target.getAttribute?.(m.attributeName)?.slice(0, 200) || null,
+              timestamp: Date.now(),
+            });
+            if (__mutationLog.length > 500) __mutationLog.shift();
+          });
+        });
+        __mutationObserver.observe(document.body || document.documentElement, {
+          childList: true,
+          subtree: true,
+          attributes: true,
+          attributeOldValue: true,
+          characterData: false,
+        });
+        return { active: true };
+      }
+      return { active: !!__mutationObserver, captured: __mutationLog.length };
+    },
+
+    /** 获取 DOM 变更日志 */
+    getMutationLog: () => ({ mutations: __mutationLog.slice(0, 100), count: __mutationLog.length }),
+
+    /** 清除 DOM 变更日志 */
+    clearMutationLog: () => { __mutationLog = []; return { cleared: true }; },
+
+    /** 获取光标位置（input/textarea） */
+    getCaretPosition: (p) => {
+      const el = findElement(p.selector || ':focus');
+      if (!el) throw new Error('No focused or matching element found');
+      if (el.tagName !== 'INPUT' && el.tagName !== 'TEXTAREA') throw new Error('Element must be INPUT or TEXTAREA');
+      return { start: el.selectionStart, end: el.selectionEnd, valueLength: el.value.length, direction: el.selectionDirection };
+    },
+
+    /** 设置光标位置 */
+    setCaretPosition: (p) => {
+      const el = findElement(p.selector || ':focus');
+      if (!el) throw new Error('No focused or matching element found');
+      el.focus();
+      el.setSelectionRange(p.start || 0, p.end !== undefined ? p.end : (p.start || 0), p.direction || 'none');
+      return { start: el.selectionStart, end: el.selectionEnd };
+    },
+
+    /** 检测页面深色模式 */
+    detectDarkMode: () => {
+      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      const htmlClass = document.documentElement.classList.contains('dark') || document.documentElement.classList.contains('theme-dark');
+      const htmlAttr = document.documentElement.getAttribute('data-theme') === 'dark';
+      const bgColor = window.getComputedStyle(document.body).backgroundColor;
+      const bgRgb = bgColor.match(/\d+/g);
+      const isDarkBg = bgRgb ? (parseInt(bgRgb[0]) < 128 && parseInt(bgRgb[1]) < 128 && parseInt(bgRgb[2]) < 128) : false;
+      return { prefersDark, htmlClass, htmlAttr, isDarkBg, darkMode: prefersDark || htmlClass || htmlAttr || isDarkBg };
+    },
+
+    /** 检测页面语言 */
+    detectLanguage: () => {
+      return {
+        htmlLang: document.documentElement.lang || '',
+        metaCharset: document.querySelector('meta[charset]')?.getAttribute('charset') || '',
+        metaContentType: document.querySelector('meta[http-equiv="Content-Type"]')?.getAttribute('content') || '',
+      };
+    },
+
+    /** 获取浏览器/设备信息 */
+    getDeviceInfo: () => {
+      const ua = navigator.userAgent;
+      const isMobile = /Mobile|Android/i.test(ua);
+      const isFirefox = /Firefox/i.test(ua);
+      const isChrome = /Chrome/i.test(ua) && !isFirefox;
+      return {
+        userAgent: ua,
+        platform: navigator.platform,
+        language: navigator.language,
+        languages: navigator.languages,
+        vendor: navigator.vendor,
+        cookieEnabled: navigator.cookieEnabled,
+        doNotTrack: navigator.doNotTrack,
+        hardwareConcurrency: navigator.hardwareConcurrency || 0,
+        deviceMemory: navigator.deviceMemory || 0,
+        maxTouchPoints: navigator.maxTouchPoints || 0,
+        screen: { width: screen.width, height: screen.height, availWidth: screen.availWidth, availHeight: screen.availHeight, colorDepth: screen.colorDepth, pixelDepth: screen.pixelDepth },
+        innerSize: { width: window.innerWidth, height: window.innerHeight },
+        isMobile, isFirefox, isChrome,
+      };
+    },
+
+    /** 聚焦元素 */
+    focusElement: (p) => {
+      const el = findElement(p.selector);
+      if (!el) throw new Error(`Element not found: ${p.selector}`);
+      el.focus();
+      return { success: true, tag: el.tagName, activeElement: document.activeElement === el };
+    },
+
+    /** 获取页面所有 iframe 基本信息 */
+    getIFrames: () => {
+      const iframes = [];
+      document.querySelectorAll('iframe').forEach((iframe, i) => {
+        const rect = iframe.getBoundingClientRect();
+        iframes.push({
+          index: i,
+          src: iframe.src || '',
+          id: iframe.id || '',
+          name: iframe.name || '',
+          width: rect.width,
+          height: rect.height,
+          sandbox: iframe.sandbox?.value || '',
+          allow: iframe.allow || '',
+          loading: iframe.loading || '',
+        });
+      });
+      return { iframes, count: iframes.length };
+    },
+
+    /** 静音/取消静音页面音频 */
+    mutePage: (p) => {
+      const mute = p.mute !== false;
+      document.querySelectorAll('audio, video').forEach(el => { el.muted = mute; });
+      return { muted: mute, elements: document.querySelectorAll('audio, video').length };
+    },
+
           x: Math.round(rect.x), y: Math.round(rect.y),
           width: Math.round(rect.width), height: Math.round(rect.height),
           centerY: Math.round(rect.y + rect.height / 2),

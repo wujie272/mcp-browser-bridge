@@ -4,154 +4,233 @@
   <meta charset="utf-8">
   <style>
     :root {
-      --bg: #1a1b1e;
-      --card: #25262b;
-      --border: #373a40;
-      --text: #c1c2c5;
-      --text-bright: #ffffff;
-      --accent: #4c9aff;
-      --green: #51cf66;
-      --red: #ff6b6b;
-      --orange: #fcc419;
-      --radius: 8px;
+      --bg: #1a1b1e; --card: #25262b; --border: #373a40;
+      --text: #c1c2c5; --text-bright: #ffffff;
+      --accent: #4c9aff; --green: #51cf66; --red: #ff6b6b; --orange: #fcc419;
+      --tab-inactive: #2c2e33; --radius: 8px;
     }
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
-      background: var(--bg);
-      color: var(--text);
-      width: 340px;
-      font-size: 13px;
+      background: var(--bg); color: var(--text);
+      width: 380px; font-size: 13px;
     }
+    /* Header */
     .header {
-      background: var(--card);
-      padding: 12px 14px;
+      background: var(--card); padding: 10px 14px;
       border-bottom: 1px solid var(--border);
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
+      display: flex; align-items: center; justify-content: space-between;
     }
     .logo { font-weight: 700; font-size: 14px; color: var(--text-bright); }
     .logo span { color: var(--accent); }
-    .status-badge {
-      padding: 3px 10px;
-      border-radius: 12px;
-      font-size: 11px;
-      font-weight: 600;
+    .logo small { font-weight: 400; font-size: 10px; color: #666; margin-left: 4px; }
+    .status-badge { padding: 3px 10px; border-radius: 12px; font-size: 11px; font-weight: 600; cursor: pointer; transition: all 0.2s; }
+    .status-badge:hover { filter: brightness(1.2); }
+    .sc { background: #2b8a3e22; color: var(--green); border: 1px solid #2b8a3e44; }
+    .sd { background: #c92a2a22; color: var(--red); border: 1px solid #c92a2a44; }
+    .sg { background: #e6770022; color: var(--orange); border: 1px solid #e6770044; }
+    .sf { background: #c92a2a22; color: var(--red); border: 1px solid #c92a2a44; }
+    /* Tabs */
+    .tab-bar {
+      display: flex; background: var(--card); border-bottom: 1px solid var(--border);
+      overflow-x: auto; -webkit-overflow-scrolling: touch;
     }
-    .status-connected { background: #2b8a3e22; color: var(--green); border: 1px solid #2b8a3e44; }
-    .status-disconnected { background: #c92a2a22; color: var(--red); border: 1px solid #c92a2a44; }
-    .status-connecting { background: #e6770022; color: var(--orange); border: 1px solid #e6770044; }
-    .status-failed { background: #c92a2a22; color: var(--red); border: 1px solid #c92a2a44; }
+    .tab-bar::-webkit-scrollbar { height: 0; }
+    .tab-btn {
+      flex: 1; min-width: 60px; padding: 8px 6px; text-align: center;
+      font-size: 11px; color: #888; cursor: pointer; border: none; background: transparent;
+      border-bottom: 2px solid transparent; transition: all 0.15s;
+      white-space: nowrap;
+    }
+    .tab-btn:hover { color: var(--text); background: #ffffff08; }
+    .tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); }
+    /* Panels */
+    .panel { display: none; }
+    .panel.active { display: block; }
     .section { padding: 10px 14px; border-bottom: 1px solid var(--border); }
-    .section-title { font-size: 11px; font-weight: 600; text-transform: uppercase; color: #888; margin-bottom: 8px; letter-spacing: 0.5px; }
-    .info-row { display: flex; justify-content: space-between; padding: 4px 0; }
+    .section-title { font-size: 10px; font-weight: 600; text-transform: uppercase; color: #666; margin-bottom: 8px; letter-spacing: 0.5px; }
+    .info-row { display: flex; justify-content: space-between; padding: 3px 0; }
     .info-label { color: #888; }
     .info-value { color: var(--text-bright); max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .info-value.green { color: var(--green); }
+    .info-value.red { color: var(--red); }
+    .info-value.orange { color: var(--orange); }
+    /* Buttons */
     .btn {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      padding: 7px 14px;
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      background: var(--card);
-      color: var(--text);
-      cursor: pointer;
-      font-size: 12px;
-      transition: all 0.15s;
+      display: inline-flex; align-items: center; gap: 4px; padding: 6px 12px;
+      border: 1px solid var(--border); border-radius: var(--radius);
+      background: var(--card); color: var(--text); cursor: pointer;
+      font-size: 11px; transition: all 0.15s;
     }
     .btn:hover { background: #373a40; }
     .btn-primary { background: var(--accent); color: #fff; border-color: var(--accent); }
     .btn-primary:hover { filter: brightness(1.1); }
     .btn-danger { color: var(--red); border-color: #c92a2a44; }
     .btn-danger:hover { background: #c92a2a22; }
-    .btn-row { display: flex; gap: 8px; flex-wrap: wrap; }
+    .btn-sm { padding: 4px 8px; font-size: 10px; }
+    .btn-row { display: flex; gap: 6px; flex-wrap: wrap; margin: 6px 0; }
     .url-box {
-      background: var(--card);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      padding: 8px 10px;
-      font-size: 11px;
-      word-break: break-all;
-      color: var(--text);
-      max-height: 44px;
-      overflow: hidden;
-      margin-top: 4px;
+      background: #00000033; border: 1px solid var(--border); border-radius: var(--radius);
+      padding: 6px 8px; font-size: 10px; word-break: break-all; color: var(--text);
+      max-height: 36px; overflow: hidden; margin-top: 4px;
     }
-    .actions { display: flex; flex-wrap: wrap; gap: 8px; }
     .log-box {
-      background: #00000033;
-      border-radius: var(--radius);
-      padding: 8px;
-      max-height: 80px;
-      overflow-y: auto;
-      font-family: 'SF Mono', 'Fira Code', monospace;
-      font-size: 10px;
-      line-height: 1.5;
+      background: #00000033; border-radius: var(--radius); padding: 6px;
+      max-height: 120px; overflow-y: auto;
+      font-family: 'SF Mono', 'Fira Code', monospace; font-size: 10px; line-height: 1.4;
     }
-    .log-entry { color: #888; }
+    .log-entry { color: #888; padding: 1px 0; }
     .log-entry.ok { color: var(--green); }
     .log-entry.err { color: var(--red); }
-    .footer { padding: 8px 14px; text-align: center; font-size: 10px; color: #555; }
+    .log-entry.info { color: var(--accent); }
+    /* Tab list */
+    .tab-list { max-height: 200px; overflow-y: auto; }
+    .tab-item {
+      display: flex; align-items: center; gap: 6px; padding: 5px 0;
+      border-bottom: 1px solid var(--border); font-size: 11px;
+    }
+    .tab-item:last-child { border-bottom: none; }
+    .tab-item .title { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text); }
+    .tab-item .title.active { color: var(--accent); font-weight: 600; }
+    .tab-item .url-tag { font-size: 9px; color: #666; max-width: 100px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    /* Input */
+    .ws-input {
+      width: 100%; padding: 6px 8px; background: #00000033;
+      border: 1px solid var(--border); border-radius: var(--radius);
+      color: var(--text-bright); font-size: 11px; font-family: monospace;
+      outline: none;
+    }
+    .ws-input:focus { border-color: var(--accent); }
+    .footer { padding: 6px 14px; text-align: center; font-size: 10px; color: #555; }
     a { color: var(--accent); text-decoration: none; }
+    .badge { display: inline-block; padding: 1px 5px; border-radius: 8px; font-size: 9px; font-weight: 600; }
+    .badge-green { background: #2b8a3e22; color: var(--green); }
+    .badge-red { background: #c92a2a22; color: var(--red); }
+    .badge-orange { background: #e6770022; color: var(--orange); }
+    .quick-actions { display: flex; gap: 6px; flex-wrap: wrap; }
   </style>
 </head>
 <body>
   <div class="header">
-    <div class="logo">MCP <span>Bridge</span></div>
-    <span id="statusBadge" class="status-badge status-disconnected">● 未连接</span>
+    <div class="logo">MCP <span>Bridge</span> <small>v2</small></div>
+    <span id="statusBadge" class="status-badge sd" title="点击切换连接状态">● 未连接</span>
   </div>
 
-  <div class="section">
-    <div class="section-title">连接</div>
-    <div class="btn-row">
-      <button class="btn btn-primary" id="btnConnect">连接</button>
-      <button class="btn btn-danger" id="btnDisconnect">断开</button>
-      <button class="btn" id="btnReconnect">⟳ 重连</button>
-    </div>
-    <div style="margin-top:8px">
-      <div class="info-row">
-        <span class="info-label">WebSocket</span>
-        <span class="info-value" id="wsUrl">ws://127.0.0.1:9234</span>
+  <!-- Tab Bar -->
+  <div class="tab-bar">
+    <button class="tab-btn active" data-tab="info">📊 状态</button>
+    <button class="tab-btn" data-tab="tabs">📑 标签</button>
+    <button class="tab-btn" data-tab="network">🌐 网络</button>
+    <button class="tab-btn" data-tab="tools">🛠 工具</button>
+    <button class="tab-btn" data-tab="settings">⚙ 设置</button>
+  </div>
+
+  <!-- Panel: 状态 -->
+  <div class="panel active" id="panel-info">
+    <div class="section">
+      <div class="section-title">连接</div>
+      <div class="btn-row">
+        <button class="btn btn-primary" id="btnConnect">🔗 连接</button>
+        <button class="btn btn-danger" id="btnDisconnect">⏹ 断开</button>
+        <button class="btn" id="btnReconnect">⟳ 重连</button>
       </div>
-      <div class="info-row">
-        <span class="info-label">重连次数</span>
-        <span class="info-value" id="reconnectCount">0</span>
+      <div class="info-row"><span class="info-label">WebSocket</span><span class="info-value" id="wsUrl">ws://127.0.0.1:9234</span></div>
+      <div class="info-row"><span class="info-label">状态</span><span class="info-value" id="statusText">未连接</span></div>
+      <div class="info-row"><span class="info-label">运行时长</span><span class="info-value" id="uptimeText">0s</span></div>
+      <div class="info-row"><span class="info-label">命令 (总/错)</span><span class="info-value" id="cmdStats">0 / 0</span></div>
+      <div class="info-row"><span class="info-label">重连次数</span><span class="info-value" id="reconnectCount">0</span></div>
+      <div class="info-row"><span class="info-label">待处理命令</span><span class="info-value" id="pendingCount">0</span></div>
+    </div>
+    <div class="section">
+      <div class="section-title">当前页面</div>
+      <div class="info-row"><span class="info-label" id="pageTitle">—</span></div>
+      <div class="url-box" id="pageUrl">—</div>
+    </div>
+    <div class="section" style="border-bottom:none">
+      <div class="section-title">日志</div>
+      <div class="log-box" id="logBox"><div class="log-entry">就绪</div></div>
+    </div>
+  </div>
+
+  <!-- Panel: 标签 -->
+  <div class="panel" id="panel-tabs">
+    <div class="section">
+      <div class="section-title">标签页 <span id="tabCount" style="color:#666;font-weight:400">(0)</span></div>
+      <div class="btn-row">
+        <button class="btn btn-sm" id="btnRefreshTabs">↻ 刷新</button>
+        <button class="btn btn-sm btn-danger" id="btnCloseAllTabs">✕ 关闭全部</button>
       </div>
-      <div class="info-row">
-        <span class="info-label">待处理命令</span>
-        <span class="info-value" id="pendingCount">0</span>
+      <div class="tab-list" id="tabList">
+        <div class="info-label" style="padding:8px 0">点击刷新以加载标签页列表</div>
       </div>
     </div>
   </div>
 
-  <div class="section">
-    <div class="section-title">当前页面</div>
-    <div class="info-row">
-      <span class="info-label" id="pageTitle">—</span>
+  <!-- Panel: 网络 -->
+  <div class="panel" id="panel-network">
+    <div class="section">
+      <div class="section-title">网络请求监控</div>
+      <div class="btn-row">
+        <button class="btn btn-sm btn-primary" id="btnNetStart">▶ 开始</button>
+        <button class="btn btn-sm btn-danger" id="btnNetStop">⏹ 停止</button>
+        <button class="btn btn-sm" id="btnNetClear">✕ 清除</button>
+        <button class="btn btn-sm" id="btnNetRefresh">↻ 刷新</button>
+      </div>
+      <div class="info-row"><span class="info-label">捕获数量</span><span class="info-value" id="netCount">0</span></div>
+      <div class="info-row"><span class="info-label">状态</span><span class="info-value" id="netStatus">未启动</span></div>
+      <div style="margin-top:6px">
+        <div class="log-box" style="max-height:180px" id="netLogBox">
+          <div class="log-entry">等待启动网络监控...</div>
+        </div>
+      </div>
     </div>
-    <div class="url-box" id="pageUrl">—</div>
   </div>
 
-  <div class="section">
-    <div class="section-title">快速操作</div>
-    <div class="actions">
-      <button class="btn" id="btnRefreshInfo">↻ 刷新信息</button>
+  <!-- Panel: 工具 -->
+  <div class="panel" id="panel-tools">
+    <div class="section">
+      <div class="section-title">快速操作</div>
+      <div class="quick-actions">
+        <button class="btn btn-sm" id="btnRefreshInfo">↻ 刷新信息</button>
+        <button class="btn btn-sm" id="btnCopyUrl">📋 复制URL</button>
+        <button class="btn btn-sm" id="btnCopyTitle">📋 复制标题</button>
+        <button class="btn btn-sm" id="btnListTabs">📑 刷新标签</button>
+        <button class="btn btn-sm" id="btnStartConsole">📟 监控控制台</button>
+        <button class="btn btn-sm" id="btnClearConsole">🧹 清控制台</button>
+      </div>
+    </div>
+    <div class="section" style="border-bottom:none">
+      <div class="section-title">控制台日志 <span id="consoleCount" style="color:#666;font-weight:400">(0)</span></div>
+      <div class="log-box" style="max-height:200px" id="consoleBox">
+        <div class="log-entry">等待捕获...</div>
+      </div>
     </div>
   </div>
 
-  <div class="section">
-    <div class="section-title">事件日志</div>
-    <div class="log-box" id="logBox">
-      <div class="log-entry">启动中...</div>
+  <!-- Panel: 设置 -->
+  <div class="panel" id="panel-settings">
+    <div class="section">
+      <div class="section-title">WebSocket 地址</div>
+      <input class="ws-input" id="wsUrlInput" value="ws://127.0.0.1:9234" placeholder="ws://127.0.0.1:9234" />
+      <div class="btn-row" style="margin-top:6px">
+        <button class="btn btn-sm btn-primary" id="btnSaveWsUrl">保存并重连</button>
+      </div>
+      <div style="margin-top:8px; padding:6px; background:#00000022; border-radius:var(--radius); font-size:11px; color:#888">
+        Firefox 扩展通过 WebSocket 连接 Termux MCP 服务。<br/>
+        默认地址: <code style="color:var(--accent)">ws://127.0.0.1:9234</code>
+      </div>
+    </div>
+    <div class="section" style="border-bottom:none">
+      <div class="section-title">关于</div>
+      <div class="info-row"><span class="info-label">版本</span><span class="info-value">2.0.0</span></div>
+      <div class="info-row"><span class="info-label">扩展 ID</span><span class="info-value" style="font-size:10px">mcp-bridge@termux</span></div>
+      <div class="info-row"><span class="info-label">权限</span><span class="info-value" style="font-size:10px">tabs · storage · webNavigation · cookies · downloads · bookmarks · history · notifications · contextMenus · alarms</span></div>
     </div>
   </div>
 
   <div class="footer">
-    MCP Browser Bridge v1.0 · <a href="#" id="linkOptions">选项</a>
+    MCP Browser Bridge v2.0 · 在 popup 外点击关闭
   </div>
-
   <script src="popup.js"></script>
 </body>
 </html>

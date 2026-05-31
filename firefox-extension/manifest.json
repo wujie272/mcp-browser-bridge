@@ -1,8 +1,8 @@
 {
   "manifest_version": 2,
   "name": "MCP Browser Bridge",
-  "version": "1.1.0",
-  "description": "将手机 Firefox 浏览器暴露给 Termux MCP 使用，支持 AI 操控浏览器",
+  "version": "2.0.0",
+  "description": "将手机 Firefox 浏览器暴露给 Termux MCP 使用，支持 AI 操控浏览器。v2: 书签/历史/下载/窗口/截图/网络拦截/控制台监控",
   "author": "MCP Bridge",
 
   "browser_specific_settings": {
@@ -19,7 +19,14 @@
     "<all_urls>",
     "webNavigation",
     "cookies",
-    "clipboardWrite"
+    "clipboardWrite",
+    "clipboardRead",
+    "bookmarks",
+    "history",
+    "downloads",
+    "notifications",
+    "contextMenus",
+    "alarms"
   ],
 
   "background": {
@@ -39,7 +46,7 @@
 
   "browser_action": {
     "default_popup": "popup/popup.html",
-    "default_title": "MCP Browser Bridge",
+    "default_title": "MCP Browser Bridge v2.0",
     "default_icon": {
       "48": "icons/icon.svg",
       "96": "icons/icon.svg"
